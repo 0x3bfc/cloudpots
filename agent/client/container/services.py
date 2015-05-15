@@ -60,7 +60,13 @@ class ContainerEngine():
 	def removeContainer(self, client, container):
 
 		"""stop container then remove the stopped one"""
-		client.stop(container)
-		client.remove_container(container)
+		try:
+			client.stop(container)
+		except:
+			pass
+		try:
+			client.remove_container(container)
+		except:
+			return False
 		return True
 

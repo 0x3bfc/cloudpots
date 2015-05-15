@@ -23,7 +23,7 @@ from setuptools import setup
 setup(
 	name='cpot-manager',
 	version='0.1',
-	description='',
+	description='CLOUDPOTS provides creating container based clusters',
 	author='Ahmed Abdullah', author_email='info@cloudpots.com',
 	url='http://cloudpots.com/',
 	install_requires=['flask', 'requests','docker-py','configobj']
