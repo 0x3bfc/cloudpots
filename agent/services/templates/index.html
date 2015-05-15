@@ -1,0 +1,79 @@
+<!doctype html>
+<html>
+	<head>
+		<link href="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" rel="stylesheet">
+	</head>
+	<body>
+		<div class="container">
+			<div class="header">
+				<h3 class="text-muted">CLOUDPOTS CONTAINER CLUSTER</h3>
+			</div>
+			<hr/>
+			<div>
+				<p>Pots Manager API services will return a JSON-encoded response for your running containers.
+				 Check out Cloud POTS <a href="https://github.com/aabdulwahed/cloudpots" target="_blank">GitHub's CLOUDPOTS</a>.</p>
+				<p>To fiddle with a JSON response, requests includes a <code>json()</code>
+				method for the response object, which can be acessed like a regular dict:</p>
+				<button class="btn" onclick="execute_get();">List Containers</button> <button class="btn" onclick="execute_images();">List Images</button> <button class="btn" onclick="execute_create();">Create Container</button> <button class="btn btn-danger" onclick="execute_remove();">Remove Containers</button><br/><br/>
+				<div class="well"><pre id="sample-result"></pre></div>
+			</div>
+		</div>
+		<script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+		<script src="//netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+		<script type="text/javascript">
+			function execute_get() {
+				$.get('/get_pot', function(data) {
+					$("#sample-result").text(data);
+				});
+			}
+			function execute_images() {
+                                $.get('/images', function(data) {
+                                        $("#sample-result").text(data);
+                                });
+                        }
+			function execute_create(){
+				$('#progress_msg').html("creating Container in progress");
+				$('#myModal').modal('show');
+				$.get('/create', function(data) {
+					$('#myModal').modal('hide');
+                                        $("#sample-result").text(data);
+                                });
+			}
+			function execute_post() {
+				$.get('/post_pot', function(data) {
+					$("#sample-result-post").text(data);
+				});
+			}
+			function execute_remove() {
+				if( confirm("All containers will be terminated !!, Are you sure ?")){
+					$('#progress_msg').html("Removing Containers in progress");
+					$('#myModal').modal('show');
+                                	$.get('/remove_containers', function(data) {
+						$('#myModal').modal('hide');  
+                                        	$("#sample-result").text(data);
+                               		});
+				}
+                        }
+			execute_get();
+		</script>
+	<div id="footer">
+      		<div class="container">
+        		<p class="muted credit">Check out our website for more information <a href="http://cloudpots.com" target="_blank">www.cloudpots.com</a>.</p>
+     		 </div>
+    	</div>
+
+
+	<div class="modal fade" id="myModal" data-backdrop="static" data-keyboard="false" aria-hidden="true">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<div class="modal-body">
+					<h2 id='progress_msg'></h2>
+					<img src='/imgs/loading.gif' class="img-responsive"/>
+				</div>
+			</div>
+		</div>
+	</div>
+	
+	</body>
+	
+</html>
