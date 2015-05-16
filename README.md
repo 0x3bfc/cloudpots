@@ -1,6 +1,6 @@
 # CLOUDPOTS
 
-[![Travis CI](https://travis-ci.org/aabdulwahed/cloudpots.svg?branch=master)](https://travis-ci.org/aabdulwahed/cloudpots.svg?branch=master)
+[![Travis CI](https://travis-ci.org/aabdulwahed/cloudpots.svg?branch=master)](https://travis-ci.org/aabdulwahed/cloudpots)
 
 **_Linux Container Based Cluster Over Public Cloud_**
 
