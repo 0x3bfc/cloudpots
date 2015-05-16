@@ -1,4 +1,4 @@
-import os, urllib2
+import os, urllib2, time
 from procs import Procs
 from config import Configuration
 import simplejson as json 
@@ -10,13 +10,14 @@ import simplejson as json
 
 _RESOURCES_ = '%s/resources.conf'%(os.path.dirname(os.path.abspath(__file__)))
 _DOCKER_ADDR_ = '172.17.0.1'
-
+_NET_IF_ = "eth0"
+ 
 class Controller():
 
 	def __init__(self):
 		self.machine_client = Procs()
 		self.configurations = Configuration()
-
+		self.local_ip = self.machine_client._exec("ifconfig %s | grep 'inet addr:'"%(_NET_IF_ )).split(":")[1].split(" ")[0]
 		try:
 			self.available_resources = {'cpu': self.machine_client._cpu_count(),
 						    'mem': self.machine_client._mem_size()}
@@ -56,7 +57,7 @@ class Controller():
 		return False
 
 	# connect pots ring
-	def connect_ring(hosts):
+	def connect_ring(self, hosts):
 		ring_addresses = {}
 		i = 0
 		# prepare hosts dictionary and check remote hosts connectivity
@@ -65,26 +66,33 @@ class Controller():
 			docker_addr[2] = str(i)
 			k = 0
 			while(1):
-				if self.check_connectivity(addr):
+				if self.local_ip == addr:
 					ring_addresses[addr] = '.'.join(docker_addr)
 					break
+				elif self.check_connectivity(addr):
+					ring_addresses[addr] = '.'.join(docker_addr)
+					break
+				else:
+					time.sleep(2)
 				if k > 5:
 					break
 				k +=1
-				time.sleep(2)
-
+			i +=1
 		# assign remote host and connect the ring
 		addr_index = 0
 		ring = {}		
 		for host in hosts:
-			if addr_index < len(hosts) -1:
-				response = self.get_ring_response(host, ring_addresses[host], hosts[add_index+1])
+			if host == self.local_ip:
+				response = self.connect_host(ring_addresses[host], hosts[addr_index+1])
+				response = json.dumps({'connected':response})
+			elif addr_index < len(hosts) -1:
+				response = self.get_ring_response(host, ring_addresses[host], hosts[addr_index+1])
 				#self.connect_host(ring_addresses[host], hosts[add_index+1])
 			else:
 				response = self.get_ring_response(host, ring_addresses[host], hosts[0])
 				#self.connect_host(ring_addresses[host], hosts[0])
 			ring[host] = {'docker_addr': ring_addresses[host], 'status':json.loads(response)}
-			addr_indes +=1
+			addr_index +=1
 
 		return ring	
 		
@@ -92,7 +100,8 @@ class Controller():
 	# get ring response
 	def get_ring_response(self, host, docker_addr, remote_host):
 		try:
-			json_response = urllib2.urlopen("http://%s/connect_ring?docker_add=%s&remote_host=%s"%(host, docker_addr, remote_host)).read()
+			print "http://%s/connect?docker_addr=%s&remote_host=%s"%(host, docker_addr, remote_host)
+			json_response = urllib2.urlopen("http://%s/connect?docker_addr=%s&remote_host=%s"%(host, docker_addr, remote_host)).read()
 			return json_response
 		except urllib2.HTTPError, e:
 			#checksLogger.error('HTTPError = ' + str(e.code))

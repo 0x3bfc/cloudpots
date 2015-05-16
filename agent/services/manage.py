@@ -167,6 +167,24 @@ def connect_host_to_ring():
 	response = controller.connect_host(docker_addr, remote_host)
 	return json.dumps({'connected':response})
 
+def render_error(message):
+	return render_template('%s.html'%(str(message))), message
+
+
+# start ring
+@manage.route('/ring', methods=['POST'])
+def start_ring():
+	if not request.json or not 'hosts' in request.json:
+		render_error(400)
+	controller = Controller()
+	try:
+		response = controller.connect_ring(request.json["hosts"])
+	except:
+		return json.dumps({'ERROR':'Unable to configure ring network'})
+
+	return json.dumps(response)
+
+
 # main page
 @manage.route('/')
 def index():
