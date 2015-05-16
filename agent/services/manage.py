@@ -151,6 +151,21 @@ def pull_image():
 	except:
 		return json.dumps({"ERROR":"Expected image name"})
 
+# connect host to ring
+@manage.route('/connect')
+def connect_host_to_ring():
+	# http://%s/connect_ring?docker_add=%s&remote_host=%s
+	try:
+		if 'docker_addr' in request.args:
+			docker_addr = request.args['docker_addr']
+		if 'remote_host' in request.args:
+			remote_host = request.args['remote_host']
+	except:
+		return json.dumps({"ERROR": "Expected docker bridge address and remote host to connect the ring"})
+
+	controller = Controller()
+	response = controller.connect_host(docker_addr, remote_host)
+	return json.dumps({'connected':response})
 
 # main page
 @manage.route('/')
@@ -158,8 +173,6 @@ def index():
 	return render_template('index.html')
 
 if __name__ == '__main__':
-	#print create_pot()
-	#raise Exception()
 	manage.run( 
 		host="0.0.0.0",
 		port=int("80")
