@@ -100,7 +100,6 @@ class Controller():
 	# get ring response
 	def get_ring_response(self, host, docker_addr, remote_host):
 		try:
-			print "http://%s/connect?docker_addr=%s&remote_host=%s"%(host, docker_addr, remote_host)
 			json_response = urllib2.urlopen("http://%s/connect?docker_addr=%s&remote_host=%s"%(host, docker_addr, remote_host)).read()
 			return json_response
 		except urllib2.HTTPError, e:
