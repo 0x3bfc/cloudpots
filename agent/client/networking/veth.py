@@ -14,7 +14,7 @@ class VirtualEthernet():
 	# init
 	def __init__(self):
 		# initialization
-		self.proc = Proc()
+		self.proc = Procs()
  
 	# get docker bridge ip address
 	def get_docker_br(self):
@@ -22,9 +22,12 @@ class VirtualEthernet():
 
 
 	# check availability of container ip
-	def check_availability(self, container_ip):
-		for line in self.proc._exec("ifconfig | grep 'inet addr:'").split('\n')
-			ip_list.append(line.split(":")[1].split(" ")[0])
+	def check_availability(self, container_ip, ip_list=[]):
+		for line in self.proc._exec("ifconfig | grep 'inet addr:'").split('\n'):
+			try:
+				ip_list.append(line.split(":")[1].split(" ")[0])
+			except:
+				pass
 		for ip in ip_list:
 			if ip.replace(' ','') == container_ip:
 				return True
@@ -35,7 +38,8 @@ class VirtualEthernet():
 		try:
 			k = 0
 			while(1):
-				container_ip = '.'.join(docker_ip.split('.')[:-1],random.randint(1,254))
+				docker_prefix = '.'.join(docker_ip.split('.')[:-1])
+				container_ip = '.'.join([docker_prefix,str(random.randint(1,254))])
 				if not self.check_availability(container_ip):
 					return container_ip
 				if k >= 254:
@@ -51,45 +55,43 @@ class VirtualEthernet():
 		return True
 
 	# get containers
-	def get_containers(self, containers_json = None):
+	def get_containers(self, containers_json = {}):
 		if os.path.exists(_CONTAINERS_):
 			with open(_CONTAINERS_) as datafile:
-				containers_json = json.loads(datafile)
+				containers_json = json.loads(datafile.read())
 		return containers_json
 	
 	# get virtual eth
 	def get_veths(self, veths=[]):
 		lines = self.proc._exec("ifconfig | grep 'veth'").split('\n')
 		for line in lines:
-			veths.append(line.split(' ')[0])
+			if line.split(' ')[0] != '':
+				veths.append(line.split(' ')[0])
 		return veths
 
 	# modify containers list
 	def modify_containers_list(self, container_id, container_ip, node_ip, veth, docker_ip):
 		
 		containers_json = self.get_containers()
-
+		
+		bridge = "br0"
 		containers_json[container_id] = {
 					'container_ip':container_ip,
 					'veth': veth,
 					'node_ip': node_ip,
 					'docker_ip': docker_ip,
-					'bridge': 'br0'
-					}
+					'bridge': bridge}
 		# modify /etc/hosts
 		self.configure_hosts_file(containers_json)
 
 		with open( _CONTAINERS_, 'w') as outputfile:
-			json.dumps(containers_json)
+			outputfile.write(json.dumps(containers_json))
 
 	# broadcast containers list to all cluster's nodes
 	def broadcast_containers_list(self, local_ip ,json_file = _CONTAINERS_):
 
-		if os.path.exists(json_file):
-			with open(json_file) as datafile:
-				containers_json = json.loads(datafile)
-			if self.broadcast(local_ip, containers_json) != None:
-				return True
+		if self.broadcast(local_ip, self.get_containers()) != None:
+			return True
 		return False
 
 	# broadcast messages using POST method			
@@ -109,9 +111,24 @@ class VirtualEthernet():
 	# configure /etc/hosts
 	def configure_hosts_file(self, containers):
 		hosts_list = ""
-		for key, value in containers:
-			hosts_list += "%s\t%s\n"%(containers[key]['node_ip'])
-			hosts_list += "%s\t%s\n"%(containers[key]['container_ip'])
+		for key, value in containers.iteritems():
+			#raise Exception(containers[key]['node_ip'])
+			hosts_list += "%s\t%s\n"%(containers[key]['node_ip'], 'host1')
+			hosts_list += "%s\t%s\n"%(containers[key]['container_ip'],'container1')
 
 		hosts_file = open(_HOSTS_FILE_, 'w')
-		hosts_list.write(hosts_list)							
+		hosts_file.write(hosts_list)
+
+veth_obj = VirtualEthernet()
+
+if veth_obj.check_availability('172.18.0.1'):
+	print "exist"
+else: 
+	print "not"
+
+
+veths = veth_obj.get_veths()
+ip =  veth_obj.get_random_ip(veth_obj.get_docker_br())
+#print veth_obj.get_containers()
+veth_obj.modify_containers_list("9f6f34a4934b6a5430960c81171bd5b1b9580fd454d266e28e1c2e4833f31341", ip, '192.168.1.7', veths[0], veth_obj.get_docker_br())
+#print veth_obj.connect_container(ip, 'docker0')
