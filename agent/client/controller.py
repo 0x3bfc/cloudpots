@@ -1,4 +1,4 @@
-import os
+import os, urllib2
 from procs import Procs
 from config import Configuration
 
@@ -31,5 +31,22 @@ class Controller():
 	def set_resources(self, resources):
 		if self.configurations.reset_config(_RESOURCES_, resources):
 			return True
+		return False
+	
+	# check connectivity
+	def check_connectivity(self, remote_host_ip):
+		try:
+			response = urllib2.urlopen('http://%s'%(remote_host_ip),timeout=1)
+			return True
+		except:
+			return False	
+		
+
+	# connecting hosts 
+	def connect_host(self, docker_ip, remote_host_ip):
+		if self.check_connectivity(remote_host_ip):
+			if 'error' not in self.machine_client._exec('bash %s/networking/ovs-script.sh %s %s'%(os.path.dirname(os.path.abspath(__file__)), docker_ip, remote_host_ip)):
+				return True
+			return False
 		return False
 
