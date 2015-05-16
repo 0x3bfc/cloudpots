@@ -1,5 +1,7 @@
 # CLOUDPOTS
 
+[![Travis CI](https://travis-ci.org/aabdulwahed/cloudpots.svg?branch=master)](https://travis-ci.org/aabdulwahed/cloudpots.svg?branch=master)
+
 **_Linux Container Based Cluster Over Public Cloud_**
 
 CLOUDPOTS is an open source project that supports creating a Linux container based clusters over
