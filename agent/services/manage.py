@@ -22,7 +22,7 @@ from flask import request
 from flask import Flask, session, render_template
 from container.container import Container
 from controller import Controller
-
+from networking.veth import VirtualEthernet
  
 manage = Flask(__name__,  static_url_path = "/imgs", static_folder = "%s/imgs"%(os.path.dirname(os.path.abspath(__file__))))
 
@@ -35,6 +35,19 @@ _CPU_		= 1
 _MEM_		= 1
 _PORTS_ 	= {5000: 5000, 22:2200, 80:8000 }
 _COMMAND_	= None
+
+
+# assgin container ip address to interface:
+def assgin_ip(container_id):
+	veth_client = VirtualEthernet()
+	ip = veth_client.get_container_ip(container_id)
+	# get_interfaces on running host
+	interfaces = veth_client.get_network_interfaces()
+	for interface in interfaces:
+		if veth_client.get_interface_ip(interface) == '':
+			veth_client.assgin_ip_addr(interface, ip)
+			return True
+	return False
 
 # create container
 @manage.route('/create')
@@ -88,6 +101,7 @@ def create_pot():
 				controller.set_resources({'RESOURCES':{'cpu': cpu_resources, 
 					 			'mem': mem_resources,
 								'ports': int(controller.resources['RESOURCES']['ports']) + 1}})
+				assgin_ip(r['Id'])
 
 				return json.dumps(r, indent=4)
 
@@ -140,6 +154,41 @@ def images():
 	return json.dumps( container_obj.list_images(image=None), indent=4)
 
 
+# get container networks
+@manage.route('/containers')
+def get_containers():
+	veth_client = VirtualEthernet()
+	hosts = veth_client.get_hosts()
+	if len(hosts)>=1:
+		return json.dumps(veth_client.get_containers(hosts))
+	return json.dumps({"ERROR": 'expected hosts file "/root/hosts": No such a file or directory'})
+
+
+# get container ip
+@manage.route('/container')
+def get_container_data():
+	veth_client = VirtualEthernet()
+	try:
+		if 'id' in request.args:
+			container_id = request.args['id']
+	except:
+		return json.dumps({"ERROR":"Expected container id"})
+	try:
+		if 'ip' in request.args:
+			ip = request.args['ip']
+			if ip:
+				return json.dumps({'ip_address': veth_client.get_container_ip(container_id)})
+		# http://%s/container?id=%s&veth=True
+		elif 'veth' in request.args:
+			if request.args['veth']:
+				ip = veth_client.get_container_ip(container_id)
+				for interface in veth_client.get_network_interfaces():
+					if veth_client.get_interface_ip(interface) == ip:
+						return json.dumps({'veth':interface})
+			return json.dumps({"ERROR": 'unexpected request'})
+	except:
+		return json.dumps({'ERROR':'unable to trace the error'})
+
 # pull image to local repo
 @manage.route('/pull')
 def pull_image():
@@ -150,6 +199,10 @@ def pull_image():
 		return json.dumps(client.pull_image(image))
 	except:
 		return json.dumps({"ERROR":"Expected image name"})
+@manage.route('/docker_ip')
+def get_docker_ip():
+	veth_client = VirtualEthernet()
+	return json.dumps({'docker_ip': veth_client.get_docker_br()})
 
 # connect host to ring
 @manage.route('/connect')
@@ -189,7 +242,9 @@ def start_ring():
 @manage.route('/')
 def index():
 	return render_template('index.html')
-
+@manage.route('/status')
+def status():
+	return render_template('status.html')
 if __name__ == '__main__':
 	manage.run( 
 		host="0.0.0.0",

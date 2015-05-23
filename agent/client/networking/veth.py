@@ -2,12 +2,14 @@ import os, dirs, random
 import urllib, urllib2
 import simplejson as json
 from procs import Procs
-
+from request import Request
+from container.container import Container
+from collections import defaultdict
 
 _NET_IF_ = 'docker0'
 _CONTAINERS_ = '/root/containers.list'
 _HOSTS_FILE_ = '/etc/hosts'
-
+_HOSTS_ = '/root/hosts'
 
 class VirtualEthernet():
 
@@ -15,120 +17,97 @@ class VirtualEthernet():
 	def __init__(self):
 		# initialization
 		self.proc = Procs()
- 
+		self.request = Request()
+		self.local_ip = self.proc._exec("ifconfig eth0 | grep 'inet addr:'").split(":")[1].split(" ")[0]
+		self.container_obj = Container()
+        
 	# get docker bridge ip address
 	def get_docker_br(self):
 		return self.proc._exec("ifconfig %s | grep 'inet addr:'"%(_NET_IF_ )).split(":")[1].split(" ")[0]
+		
+	# get container ip
+	def get_container_ip(self, container_id):
+		return self.proc._exec("sudo docker inspect %s | grep IPAddress"%(container_id)).split(":")[1].split(',')[0].replace('"','').replace(" ",'')
 
+	# assgin ip address
+	def assgin_ip_addr(self,interface, ip):
+		return self.proc._exec("ip a add %s dev %s"%(ip, interface)) 
 
-	# check availability of container ip
-	def check_availability(self, container_ip, ip_list=[]):
-		for line in self.proc._exec("ifconfig | grep 'inet addr:'").split('\n'):
-			try:
-				ip_list.append(line.split(":")[1].split(" ")[0])
-			except:
-				pass
-		for ip in ip_list:
-			if ip.replace(' ','') == container_ip:
-				return True
-		return False
-
-	# get random container ip
-	def get_random_ip(self, docker_ip):
+	# get all veth interfaces
+	def get_network_interfaces(self):
+		ifc = []
 		try:
-			k = 0
-			while(1):
-				docker_prefix = '.'.join(docker_ip.split('.')[:-1])
-				container_ip = '.'.join([docker_prefix,str(random.randint(1,254))])
-				if not self.check_availability(container_ip):
-					return container_ip
-				if k >= 254:
-					break
-				k +=1
+			interfaces = self.proc._exec("ifconfig | grep veth").split('\n')
+			for interface in interfaces:
+				tmp_ifc = interface.split(' ')[0].replace(' ','')
+				if tmp_ifc != '':
+					ifc.append(tmp_ifc)
 		except:
-			return None
-
-	# connect container to docker bridge
-	def connect_container( self, ip_addr, docker_br):
-		if 'error' in  self.proc._exec("ip addr add %s dev %s"%(ip_addr, docker_br)):
-			return False
-		return True
-
+			pass
+		return ifc
+	# get interface ip
+	def get_interface_ip(self, interface):
+		return self.proc._exec("echo `ifconfig %s 2>/dev/null|awk '/inet addr:/ {print $2}'|sed 's/addr://'`"%(interface)).split("\n")[0]			
 	# get containers
-	def get_containers(self, containers_json = {}):
-		if os.path.exists(_CONTAINERS_):
-			with open(_CONTAINERS_) as datafile:
-				containers_json = json.loads(datafile.read())
-		return containers_json
-	
-	# get virtual eth
-	def get_veths(self, veths=[]):
-		lines = self.proc._exec("ifconfig | grep 'veth'").split('\n')
-		for line in lines:
-			if line.split(' ')[0] != '':
-				veths.append(line.split(' ')[0])
-		return veths
-
-	# modify containers list
-	def modify_containers_list(self, container_id, container_ip, node_ip, veth, docker_ip):
-		
-		containers_json = self.get_containers()
-		
-		bridge = "br0"
-		containers_json[container_id] = {
-					'container_ip':container_ip,
-					'veth': veth,
-					'node_ip': node_ip,
-					'docker_ip': docker_ip,
-					'bridge': bridge}
-		# modify /etc/hosts
-		self.configure_hosts_file(containers_json)
-
-		with open( _CONTAINERS_, 'w') as outputfile:
-			outputfile.write(json.dumps(containers_json))
-
-	# broadcast containers list to all cluster's nodes
-	def broadcast_containers_list(self, local_ip ,json_file = _CONTAINERS_):
-
-		if self.broadcast(local_ip, self.get_containers()) != None:
-			return True
-		return False
-
-	# broadcast messages using POST method			
-	def broadcast(self, local_ip, data):
-		broadcast_status = None
-		for key, val in data.iteritems():
-			if local_ip != data[key]['node_ip']:
-				post_data = urllib.urlencode(data)
-				req = urllib2.Request('http://%s/broadcast'%(data[key]['node_ip']), post_data)
-				response = urllib2.urlopen(req)
-				if response.read() == 'OK':
-					broadcast_status[data[key]['node_ip']] = True
-				else:
-					broadcast_status[data[key]['node_ip']] = False
-		return broadcast_status
+	def get_containers(self, hosts, response={}):
+		containers = []
+		for host in hosts:
+			# get all container running on this host
+			try:
+				if host !=self.local_ip:
+					containers = json.loads(self.request.send_request("http://%s/get_pot"%(host)))
+					docker_res = json.loads(self.request.send_request("http://%s/docker_ip"%(host)))
+					try:
+						if 'docker_ip' in docker_res:
+							docker_ip = docker_res["docker_ip"]
+					except:
+						docker_ip = "Unknown Docker ip"
 					
-	# configure /etc/hosts
-	def configure_hosts_file(self, containers):
-		hosts_list = ""
-		for key, value in containers.iteritems():
-			#raise Exception(containers[key]['node_ip'])
-			hosts_list += "%s\t%s\n"%(containers[key]['node_ip'], 'host1')
-			hosts_list += "%s\t%s\n"%(containers[key]['container_ip'],'container1')
+				else:
+					containers = self.container_obj.get_containers()
+					docker_ip = self.get_docker_br()
+				response[host] = {}
+				response[host]['containers'] = []
+				for container in containers:
+					if host == self.local_ip:
+						container_ip = self.get_container_ip(container["Id"][:12])
+						for interface in self.get_network_interfaces():
+							if self.get_interface_ip(interface) == container_ip:
+								veth = interface
+					else:
+						try:
+							res = json.loads(self.request.send_request("http://%s/container?id=%s&ip=True"%(host,container["Id"])))
+							veth_res = json.loads(self.request.send_request("http://%s/container?id=%s&veth=True"%(host, container["Id"])))
+							if "ip_address" in res:
+								container_ip = res["ip_address"]
+							if "veth" in veth_res:
+								veth = veth_res["veth"]
+						except:	
+							container_ip = "Unkown IP address"
+					try:
+						container_dict = {'hostname': container["Id"][:12],'interface': veth,'ip_address': container_ip}
+						response[host]['containers'].append({container["Id"] :container_dict})
+					except:
+						pass
 
-		hosts_file = open(_HOSTS_FILE_, 'w')
-		hosts_file.write(hosts_list)
+				response[host]['bridge_name'] = 'docker0'
+				response[host]['bridge_ip'] = docker_ip
+			except:	
+				pass
+			
+		return response
+	# get hosts list
+	def get_hosts(self, hosts=[]):
+		if os.path.exists(_HOSTS_):
+			file = open(_HOSTS_)
+			for line in file.readlines():
+				hosts.append(line.split('\n')[0])
+		return hosts				
 
-veth_obj = VirtualEthernet()
 
-if veth_obj.check_availability('172.18.0.1'):
-	print "exist"
-else: 
-	print "not"
-
-
-veths = veth_obj.get_veths()
-ip =  veth_obj.get_random_ip(veth_obj.get_docker_br())
-#print veth_obj.get_containers()
-veth_obj.modify_containers_list("9f6f34a4934b6a5430960c81171bd5b1b9580fd454d266e28e1c2e4833f31341", ip, '192.168.1.7', veths[0], veth_obj.get_docker_br())
-#print veth_obj.connect_container(ip, 'docker0')
+#veth_client = VirtualEthernet()
+#print veth_client.get_hosts()
+#print veth_client.get_network_interfaces()
+#if veth_client.get_interface_ip("teh0") == '':
+#	print "None"
+#print veth_client.get_containers(['192.168.1.7','192.168.1.8','192.168.1.9'])

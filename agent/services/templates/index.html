@@ -2,7 +2,9 @@
 <html>
 	<head>
 		<link href="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" rel="stylesheet">
+		<link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
 	</head>
+	<title>CLOUDPOTS-MANAGER</title>
 	<body>
 		<div class="container">
 			<div class="header">
@@ -14,6 +16,7 @@
 				 Check out Cloud POTS <a href="https://github.com/aabdulwahed/cloudpots" target="_blank">GitHub's CLOUDPOTS</a>.</p>
 				<p>To fiddle with a JSON response, requests includes a <code>json()</code>
 				method for the response object, which can be acessed like a regular dict:</p>
+				<p> <strong> Check out Your cluster status from here <a href="/status" target="_blank">CLUSTER STATUS</a></strong></p>
 				<button class="btn" onclick="execute_get();">List Containers</button> <button class="btn" onclick="execute_images();">List Images</button> <button class="btn" onclick="execute_create();">Create Container</button> <button class="btn btn-danger" onclick="execute_remove();">Remove Containers</button><br/><br/>
 				<div class="well"><pre id="sample-result"></pre></div>
 			</div>
@@ -32,7 +35,7 @@
                                 });
                         }
 			function execute_create(){
-				$('#progress_msg').html("creating Container in progress");
+				$('#progress_msg').html('<strong> Creating Container in progress ...  </strong> <i class="fa fa-cog fa-spin"></i>');
 				$('#myModal').modal('show');
 				$.get('/create', function(data) {
 					$('#myModal').modal('hide');
@@ -46,7 +49,7 @@
 			}
 			function execute_remove() {
 				if( confirm("All containers will be terminated !!, Are you sure ?")){
-					$('#progress_msg').html("Removing Containers in progress");
+					$('#progress_msg').html('<strong> Removing Containers in progress ...  </strong> <i class="fa fa-cog fa-spin"></i>');
 					$('#myModal').modal('show');
                                 	$.get('/remove_containers', function(data) {
 						$('#myModal').modal('hide');  
@@ -67,8 +70,7 @@
 		<div class="modal-dialog">
 			<div class="modal-content">
 				<div class="modal-body">
-					<h2 id='progress_msg'></h2>
-					<img src='/imgs/loading.gif' class="img-responsive"/>
+					<p id='progress_msg'></p>
 				</div>
 			</div>
 		</div>
