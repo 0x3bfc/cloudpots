@@ -30,11 +30,12 @@ manage = Flask(__name__,  static_url_path = "/imgs", static_folder = "%s/imgs"%(
 manage.secret_key = os.urandom(24)
 
 # defualt settings also used for testing 
-_DEFUALT_IMAGE_ = 'ahmedabd/cloudpot:v8'
+#_DEFUALT_IMAGE_ = 'ahmedabd/cloudpot:v8'
+_DEFAULT_IMAGE_ = 'test4'
 _CPU_		= 1
 _MEM_		= 1
-_PORTS_ 	= {5000: 5000, 22:2200, 80:8000 }
-_COMMAND_	= None
+_PORTS_ 	= {5000: 5000, 22:2200, 80:8000, 4040:4040}
+_COMMAND_	= '/bin/bash && /etc/init.d/pot2 start'
 
 
 # assgin container ip address to interface:
@@ -53,7 +54,7 @@ def assgin_ip(container_id):
 @manage.route('/create')
 def create_pot():
 
-	global _CPU_, _MEM_,_DEFUALT_IMAGE_, _PORTS_, _COMMAND_	
+	global _CPU_, _MEM_,_DEFAULT_IMAGE_, _PORTS_, _COMMAND_	
 
 	# required resources per container 
 	# 1 CPU, 1 GRAM , defualt image, ports
@@ -63,7 +64,7 @@ def create_pot():
 		if 'mem' in request.args:
 			_MEM_ = request.args['mem']
 		if 'image' in request.args:
-			_DEFUALT_IMAGE_ = request.args['image']
+			_DEFAULT_IMAGE_ = request.args['image']
 	except:
 		pass
 
@@ -87,7 +88,7 @@ def create_pot():
 			if int(resources['cpu']) > 0 and float(resources['mem']) > 0:
 
 				# initiate and start container 
-				r = c.create_container(_DEFUALT_IMAGE_, 
+				r = c.create_container(_DEFAULT_IMAGE_, 
 							command= _COMMAND_, 
 							cpu=str(acq_resources['cpu']), 
 							mem='%sg'%(str(acq_resources['mem'])), 
@@ -248,5 +249,5 @@ def status():
 if __name__ == '__main__':
 	manage.run( 
 		host="0.0.0.0",
-		port=int("80")
+		port=int("5050")
 	)
